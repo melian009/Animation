@@ -1,0 +1,90 @@
+library(animation)
+
+euclidiandist<-function(x1,y1,x2,y2){
+
+	d<-sqrt(((x2-x1)^2) + ((y2-y1)^2));
+	return(d);
+}
+
+iswithinpatches<-function(nsites,a,b,r){
+	within<-0;
+	st<-1;
+	while((st < nsites) & (!within)){
+		c<-xpos[st];d<-ypos[st];
+		dist<-euclidiandist(a,b,c,d);
+		if(dist <= r[st]) within<-1;
+		cat(paste(a,b,r[st],dist,dist*75,within,sep=" "),file="log.dat",sep="\n",append=TRUE);
+		st<-st+1;	
+	}
+	return(within);
+}
+
+#Reading landscape and abundance files
+
+landscape<-read.csv("./landscape.dat",sep=" ",header=FALSE);
+xpos<-landscape$V2;ypos<-landscape$V3;ratio<-as.numeric(landscape$V4);norm_ratio<-ratio/75.0;
+pop<-read.csv("./abundance.dat",sep=" ",header=FALSE);
+nspe<-length(pop[1,]);
+time<-length(pop[,1]);
+nind<-sum(pop[1,]);
+color<-rep("black",nind);
+position<-array(NA,dim=c(nind,2));
+colors<-c("white","blue","red","orange","pink","yellow","cyan");
+
+png("PatchesNetwork.png");
+#Drawing the landscape: patches of different sizes connected
+plot(xpos,ypos,cex=ratio/1.5,pch=19,ylim=c(0,1),xlim=c(0,1),xlab="",ylab="",axes=FALSE);
+nsites<-length(xpos);
+for(st1 in 1:(nsites-1)){
+	for(st2 in 1:nsites){
+		lines(c(xpos[st1],xpos[st2]),c(ypos[st1],ypos[st2]))
+	}
+}
+box();
+dev.off();
+
+ani.options(outdir =   getwd());
+
+saveGIF({
+	for(t in 1:time){
+		#Drawing the landscape: patches of different sizes connected
+		plot(xpos,ypos,cex=ratio/1.5,pch=19,ylim=c(0,1),xlim=c(0,1),xlab="",ylab="",axes=FALSE);
+		nsites<-length(xpos);
+		for(st1 in 1:(nsites-1)){
+			for(st2 in 1:nsites){
+				lines(c(xpos[st1],xpos[st2]),c(ypos[st1],ypos[st2]))
+			}
+		}
+		box();
+	
+		#Drawing the population dynamics: changes in abundance of individuals of different species
+	
+		k<-1;
+	#	for(i in 1:nspe){
+		i<-1; # for one metacommunity
+			nind_sp<-pop[t,i];		
+			for(j in 1:nind_sp){
+				x<-runif(1,0,1);y<-runif(1,0,1);
+				ok<-iswithinpatches(nsites,x,y,norm_ratio);
+				while(!ok){
+					x<-runif(1,0,1);y<-runif(1,0,1);
+					ok<-iswithinpatches(nsites,x,y,ratio[i]);
+				}
+				color[k]<-colors[i];
+				position[k,1]<-x;
+				position[k,2]<-y;
+				k<-k+1;
+			}
+	#	}
+		points(position,col=color,pch=19,cex=0.5);
+	}
+}, movie.name = "./animation_MetLandsDyn_2.gif", interval = 0.1, ani.width = 600, ani.height = 600)
+
+
+rich<-read.csv("./rich_frac_area.dat",sep=" ");
+png("RichFragArea.png");
+x<-as.numeric(rich$area);
+y<-as.numeric(rich$frac);
+z<-as.numeric(rich$rich);
+image(unique(sort(x)),unique(sort(y)),as.matrix(matrix(z,ncol=5)),xlab="Area",ylab="Fractal Dimension",main="Richness");
+dev.off();
